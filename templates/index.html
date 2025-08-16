@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>嵌入式学习助手</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- 滚动条 & 呼吸动画样式 -->
+    <style>
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-thumb {
+        border-radius: 4px;
+        background: rgba(0, 0, 0, 0.2);
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      @keyframes blinkDots {
+        0% {
+          content: ".";
+        }
+        33% {
+          content: "..";
+        }
+        66% {
+          content: "...";
+        }
+        100% {
+          content: ".";
+        }
+      }
+      .typing::after {
+        content: "...";
+        animation: blinkDots 1s infinite steps(1);
+        display: inline-block;
+        white-space: pre;
+        margin-left: 4px;
+      }
+      pre code.hljs {
+        display: block;
+        overflow-x: auto;
+        padding: 1em;
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+      }
+    </style>
+    <!-- ✅ 样式（GitHub 主题） -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css"
+    />
+
+    <!-- ✅ 脚本（完整版，支持自动语言识别） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <!-- ✅ 自动高亮 -->
+    <script>
+      hljs.highlightAll();
+    </script>
+    <!-- ✅ Markdown 渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  </head>
+
+  <body class="bg-slate-50 text-slate-800">
+    <div id="layoutGrid" class="min-h-screen grid grid-cols-[300px_1fr]">
+      <!-- class="min-h-screen grid grid-cols-[0_1fr] lg:grid-cols-[320px_1fr]" -->
+      <!-- Sidebar -->
+      <aside
+        id="sidebar"
+        class="hidden lg:block bg-white border-r border-slate-200 p-4 lg:p-6 w-[320px]"
+      >
+        <h1 class="text-xl font-semibold mb-3">嵌入式学习助手</h1>
+        <p class="text-sm text-slate-500 mb-4">
+          通过
+          <code class="font-mono">/workflow/v1/chat/completions</code>
+          接口流式调用。
+        </p>
+        <div class="space-y-3">
+          <!-- <label class="block text-sm font-medium">FLOW_ID</label>
+          <input
+            id="flowId"
+            type="hidden"
+            value="7356490531298697218"
+          /> -->
+
+          <label class="block text-sm font-medium">UID（可选）</label>
+          <input
+            id="uid"
+            class="w-full rounded-xl border border-slate-300 px-3 py-2"
+            placeholder="web-user"
+          />
+
+          <button
+            id="saveCfg"
+            class="w-full mt-2 rounded-2xl bg-slate-900 text-white py-2 font-medium hover:bg-slate-800"
+          >
+            保存设置
+          </button>
+
+          <div class="pt-4 text-xs text-slate-500 border-t">
+            <p>后端安全代理请求，密钥不会暴露。</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Chat -->
+      <main class="flex flex-col h-[100svh]">
+        <!-- ✅ 插入合并后的 header -->
+        <header
+          class="p-4 lg:p-6 border-b bg-white border-slate-200 flex justify-between items-center"
+        >
+          <div class="flex items-center gap-3">
+            <div
+              class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
+            ></div>
+            <div class="text-sm text-slate-600">已连接到本地服务</div>
+            <div id="status" class="text-xs text-slate-400 ml-3"></div>
+          </div>
+        </header>
+
+        <section
+          id="messages"
+          class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-4"
+        >
+          <!-- 消息展示区 -->
+        </section>
+
+        <footer class="border-t border-slate-200 bg-white">
+          <form
+            id="chatForm"
+            class="max-w-4xl mx-auto p-3 lg:p-4 flex flex-col gap-2"
+          >
+            <div
+              class="rounded-2xl border border-slate-300 focus-within:ring-2 focus-within:ring-slate-400 bg-white"
+            >
+              <textarea
+                id="input"
+                rows="3"
+                class="w-full p-3 lg:p-4 outline-none rounded-2xl resize-y"
+                placeholder="请输入问题，Shift+Enter 换行，Enter 发送"
+              ></textarea>
+            </div>
+
+            <!-- 📁 新增文件上传输入框 -->
+            <div class="text-sm text-slate-600">
+              <label class="block font-medium mb-1"
+                >上传文件（支持多个 PDF、图片、Word、PPT、Excel、TXT）</label
+              >
+              <input
+                id="fileUpload"
+                name="files"
+                type="file"
+                multiple
+                class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+              />
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button
+                id="sendBtn"
+                type="submit"
+                class="rounded-2xl bg-slate-900 text-white px-4 py-2 font-medium hover:bg-slate-800"
+              >
+                发送
+              </button>
+              <button
+                id="stopBtn"
+                type="button"
+                class="rounded-2xl bg-slate-200 text-slate-800 px-4 py-2 font-medium hover:bg-slate-300"
+                disabled
+              >
+                停止
+              </button>
+              <!-- ✅ 新增：联网搜索开关（放在停止右边） -->
+              <label
+                for="enableSearch"
+                class="flex items-center gap-2 text-sm text-slate-700"
+              >
+                <input id="enableSearch" type="checkbox" class="h-4 w-4" />
+                启用联网搜索
+              </label>
+              <button
+                id="clearBtn"
+                type="button"
+                class="ml-auto text-sm text-slate-500 hover:text-slate-700"
+              >
+                清空对话
+              </button>
+            </div>
+          </form>
+        </footer>
+      </main>
+    </div>
+    <!-- 消息模板 -->
+    <template id="msgTemplate">
+      <div class="flex items-start gap-3">
+        <div
+          class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm shrink-0"
+        ></div>
+        <div class="flex-1">
+          <div class="text-xs text-slate-500 mb-1"></div>
+          <div class="whitespace-pre-wrap leading-relaxed"></div>
+        </div>
+      </div>
+    </template>
+
+    <!-- 主逻辑脚本 -->
+    <script>
+      const FIXED_FLOW_ID = "7356490531298697218";
+      const $ = (sel) => document.querySelector(sel);
+
+      const messagesEl = $("#messages");
+      const inputEl = $("#input");
+      const chatForm = $("#chatForm");
+      const sendBtn = $("#sendBtn");
+      const stopBtn = $("#stopBtn");
+      const enableSearchEl = document.querySelector("#enableSearch");
+      const clearBtn = $("#clearBtn");
+      const statusEl = $("#status");
+
+      const uidInput = $("#uid");
+      const saveCfgBtn = $("#saveCfg");
+      let controller = null;
+      // ====== 对话历史持久化 ======
+      const HISTORY_KEY = "xfy_chat_history_v1";
+      let chatHistory = []; // [{role: "user"|"assistant", content: "markdown or text"}]
+
+      // 读取历史
+      function loadHistory() {
+        try {
+          chatHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+          if (!Array.isArray(chatHistory)) chatHistory = [];
+        } catch {
+          chatHistory = [];
+        }
+      }
+
+      // 保存历史（保留最近 100 条以防太大）
+      function saveHistory() {
+        localStorage.setItem(
+          HISTORY_KEY,
+          JSON.stringify(chatHistory.slice(-100))
+        );
+      }
+
+      // 追加一条历史
+      function appendHistory(msg) {
+        chatHistory.push({ role: msg.role, content: msg.content || "" });
+        saveHistory();
+      }
+
+      // 更新最后一条“助手消息”的内容（用于流式渲染）
+      function updateLastAssistant(content) {
+        for (let i = chatHistory.length - 1; i >= 0; i--) {
+          if (chatHistory[i].role === "assistant") {
+            chatHistory[i].content = content || "";
+            break;
+          }
+        }
+        saveHistory();
+      }
+
+      // 首次渲染历史到页面
+      function renderHistory() {
+        messagesEl.innerHTML = "";
+        for (const m of chatHistory) {
+          addMessage(m.role, m.content);
+        }
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+      saveCfgBtn.addEventListener("click", () => {
+        const cfg = {
+          uid: uidInput.value.trim(),
+          enable_search: !!(enableSearchEl && enableSearchEl.checked),
+        };
+        // ✅ 仅存 UID
+        localStorage.setItem("xfy_cfg", JSON.stringify(cfg));
+        statusEl.textContent = "设置已保存";
+        setTimeout(() => (statusEl.textContent = ""), 2000);
+      });
+
+      // 恢复本地配置
+      const savedCfg = JSON.parse(localStorage.getItem("xfy_cfg") || "{}");
+      //if (savedCfg.flow_id) flowIdInput.value = savedCfg.flow_id;
+      if (savedCfg.uid) uidInput.value = savedCfg.uid;
+      if (typeof savedCfg.enable_search === "boolean" && enableSearchEl) {
+        enableSearchEl.checked = savedCfg.enable_search;
+      }
+      // ✅ 恢复并渲染聊天历史
+      loadHistory();
+      renderHistory();
+      let thinkingLine = null;
+
+      function showThinkingLine() {
+        thinkingLine = document.createElement("div");
+        thinkingLine.className = "flex items-center gap-2 text-slate-500 px-2";
+        thinkingLine.innerHTML = `
+          <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm shrink-0 mt-1 bg-emerald-500">🤖</div>
+          <span class="typing">思考中</span>
+        `;
+        messagesEl.appendChild(thinkingLine);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function removeThinkingLine() {
+        if (thinkingLine) {
+          thinkingLine.remove();
+          thinkingLine = null;
+        }
+      }
+
+      // 渲染附件（图片缩略图 + 其他文件下载链接）
+      function renderAttachments(container, attachments = []) {
+        if (!attachments || attachments.length === 0) return;
+
+        const wrap = document.createElement("div");
+        wrap.className = "mt-2 flex flex-wrap gap-2";
+
+        attachments.forEach((file) => {
+          const url = URL.createObjectURL(file);
+
+          if (file.type.startsWith("image/")) {
+            const img = document.createElement("img");
+            img.src = url;
+            img.alt = file.name;
+            img.className =
+              "w-24 h-24 object-cover rounded-xl border border-slate-200";
+            wrap.appendChild(img);
+          } else {
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = file.name;
+            a.textContent = `${file.name} (${Math.ceil(file.size / 1024)} KB)`;
+            a.className =
+              "text-xs underline decoration-slate-400 hover:decoration-slate-700 break-all px-2 py-1 rounded-lg bg-white border border-slate-200";
+            wrap.appendChild(a);
+          }
+        });
+
+        container.appendChild(wrap);
+      }
+
+      // 顶层：代码块复制按钮
+      function addCopyButton(codeBlock) {
+        const wrapper = codeBlock.parentElement;
+        wrapper.style.position = "relative";
+
+        const button = document.createElement("button");
+        button.textContent = "复制";
+        button.className = "copy-btn";
+        button.style.position = "absolute";
+        button.style.top = "6px";
+        button.style.right = "8px";
+        button.style.padding = "2px 6px";
+        button.style.fontSize = "12px";
+        button.style.borderRadius = "4px";
+        button.style.background = "#e2e8f0";
+        button.style.color = "#1e293b";
+        button.style.cursor = "pointer";
+
+        button.onclick = () => {
+          navigator.clipboard.writeText(codeBlock.textContent).then(() => {
+            button.textContent = "已复制";
+            setTimeout(() => (button.textContent = "复制"), 1000);
+          });
+        };
+
+        if (!wrapper.querySelector(".copy-btn")) {
+          wrapper.appendChild(button);
+        }
+      }
+
+      // 聊天气泡（返回“气泡 DOM”供后续更新）
+      function addMessage(role, text = "", opts = {}) {
+        const { attachments = [] } = opts;
+
+        const line = document.createElement("div");
+        line.className =
+          role === "user"
+            ? "flex justify-end w-full"
+            : "flex justify-start w-full";
+
+        const bubble = document.createElement("div");
+
+        // 按角色分别设置聊天气泡的“宽度 + 对齐”
+        if (role === "user") {
+          // 用户：不要 flex-1；用 ml-auto 让它贴右边
+          bubble.className =
+            "min-w-0 max-w-[60%] ml-auto rounded-2xl px-4 py-3 " +
+            "shadow-sm border whitespace-pre-wrap leading-relaxed break-words";
+        } else {
+          // 助手：可以更宽
+          bubble.className =
+            "flex-1 min-w-0 max-w-[80%] rounded-2xl px-4 py-3 " +
+            "shadow-sm border whitespace-pre-wrap leading-relaxed break-words";
+        }
+
+        if (role === "user") {
+          bubble.classList.add(
+            "bg-sky-100",
+            "border-sky-200",
+            "text-sky-900",
+            "rounded-tr-sm"
+          );
+        } else {
+          bubble.classList.add(
+            "bg-emerald-50",
+            "border-emerald-200",
+            "text-slate-800",
+            "rounded-tl-sm"
+          );
+        }
+
+        const row = document.createElement("div");
+        row.className = "flex w-full items-start";
+
+        const avatar = document.createElement("div");
+        avatar.className =
+          "w-8 h-8 rounded-full flex items-center justify-center text-white text-sm shrink-0 mt-1";
+        if (role === "user") {
+          avatar.classList.add("bg-sky-500", "ml-1");
+          avatar.textContent = "🙂";
+        } else {
+          avatar.classList.add("bg-emerald-500");
+          avatar.textContent = "🤖";
+        }
+
+        const body = document.createElement("div");
+        if (role === "assistant") {
+          body.innerHTML = marked.parse(text || "");
+          body.querySelectorAll("pre code").forEach((block) => {
+            block.classList.add("hljs");
+            hljs.highlightElement(block);
+            addCopyButton(block);
+          });
+        } else {
+          body.textContent = text || "";
+        }
+
+        bubble.appendChild(body);
+        renderAttachments(bubble, attachments);
+
+        if (role === "user") {
+          row.appendChild(bubble);
+          row.appendChild(avatar);
+        } else {
+          row.appendChild(avatar);
+          row.appendChild(bubble);
+        }
+
+        line.appendChild(row);
+        messagesEl.appendChild(line);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        return bubble; // 关键：返回气泡节点
+      }
+
+      async function streamChatFormData(formData) {
+        const userInput = formData.get("user_input") || "";
+        //const flowId = formData.get("flow_id") || "";
+        const uid = formData.get("uid") || "";
+
+        // if (!flowId) {
+        //   statusEl.textContent = "请填写 FLOW_ID";
+        //   return;
+        // }
+
+        sendBtn.disabled = true;
+        stopBtn.disabled = false;
+
+        // ✅ 不创建气泡，只显示“思考中”行
+        showThinkingLine();
+
+        controller = new AbortController();
+
+        try {
+          const res = await fetch("/api/chat-stream", {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
+          if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+
+          let buffer = "";
+          let done = false;
+          let rawMarkdown = "";
+          let renderScheduled = false;
+
+          // ✅ 首个 token 到来后再创建机器人气泡
+          let botBubble = null;
+          let gotAnyDelta = false;
+
+          function renderMarkdown() {
+            if (!botBubble) return;
+            botBubble.innerHTML = marked.parse(rawMarkdown);
+            botBubble.querySelectorAll("pre code").forEach((block) => {
+              block.classList.add("hljs");
+              hljs.highlightElement(block);
+              addCopyButton(block);
+            });
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            // ✅ 同步更新最后一条助手消息的历史
+            updateLastAssistant(rawMarkdown);
+            renderScheduled = false;
+          }
+
+          while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            if (readerDone) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            const events = buffer.split("\n\n");
+            buffer = events.pop();
+
+            for (const evt of events) {
+              if (!/^\s*data:/i.test(evt)) continue;
+              // ✅ 去掉一个或多个 data: 前缀，再 trim
+              const raw = evt.replace(/^\s*(data:\s*)+/i, "").trim();
+              if (raw === "[DONE]") {
+                done = true;
+                break;
+              }
+
+              try {
+                const obj = JSON.parse(raw);
+                // 🔹 错误响应时直接显示提示
+                if (obj.code && obj.code !== 0) {
+                  removeThinkingLine();
+                  addMessage(
+                    "assistant",
+                    `❌ 出错了: ${obj.message || "未知错误"}`
+                  );
+                  done = true;
+                  break;
+                }
+                const delta = obj?.choices?.[0]?.delta?.content;
+                if (delta) {
+                  if (!gotAnyDelta) {
+                    gotAnyDelta = true;
+                    removeThinkingLine(); // 去掉“思考中”
+                    botBubble = addMessage("assistant", ""); // 现在才创建气泡
+                    appendHistory({ role: "assistant", content: "" }); // ❗ 这时再写入空助手消息
+                  }
+                  rawMarkdown += delta;
+                  if (!renderScheduled) {
+                    renderScheduled = true;
+                    requestAnimationFrame(renderMarkdown);
+                  }
+                }
+              } catch (e) {
+                console.warn("无法解析 JSON，原始事件：", evt, e);
+              }
+            }
+          }
+
+          // ✅ 整段没有任何内容：不留空泡，给个轻提示
+          if (!gotAnyDelta) {
+            removeThinkingLine();
+            const tip = document.createElement("div");
+            tip.className = "text-xs text-slate-400 px-2";
+            tip.textContent = "（未收到内容）";
+            messagesEl.appendChild(tip);
+          }
+        } catch (err) {
+          removeThinkingLine();
+          addMessage("assistant", `❌ 请求失败：${err?.message || err}`);
+        } finally {
+          sendBtn.disabled = false;
+          stopBtn.disabled = true;
+          controller = null;
+        }
+      }
+
+      // 提交事件
+      chatForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const text = inputEl.value.trim();
+        const uid = uidInput.value.trim();
+        const fileInput = document.querySelector("#fileUpload");
+        const files = [...fileInput.files];
+
+        // 没有文字也没有文件则不发送
+        if (!text && files.length === 0) return;
+
+        // 1) 先渲染“用户气泡”，同时显示文字+附件
+        addMessage("user", text, { attachments: files });
+        // ✅ 追加到历史（附件二次加载较复杂，这里只保存文本）
+        appendHistory({ role: "user", content: text });
+        // 2) 构建 FormData 发给后端
+        const formData = new FormData();
+        formData.append("user_input", text);
+        formData.append("flow_id", FIXED_FLOW_ID);
+        formData.append("uid", uid);
+        formData.append(
+          "search_website",
+          enableSearchEl && enableSearchEl.checked ? "true" : "false"
+        ); // ✅ 关键
+
+        files.forEach((file) => formData.append("files", file)); // 后端: request.files.getlist("files")
+
+        // 3) 清空输入框与文件栏
+        inputEl.value = "";
+        fileInput.value = "";
+
+        // 4) 发起流式请求
+        streamChatFormData(formData);
+      });
+
+      // 输入框 Enter 发送，Shift+Enter 换行
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          chatForm.requestSubmit();
+        }
+      });
+
+      // 停止按钮
+      stopBtn.addEventListener("click", () => {
+        if (controller) {
+          controller.abort();
+          stopBtn.disabled = true;
+          sendBtn.disabled = false;
+        }
+      });
+
+      // 清空对话按钮
+      clearBtn.addEventListener("click", () => {
+        messagesEl.innerHTML = "";
+        chatHistory = [];
+        saveHistory(); // 写回空数组
+      });
+      // ✅ 页面加载后，如果历史为空，则展示一条欢迎语（不会污染历史）
+      if (messagesEl.children.length === 0) {
+        addMessage(
+          "assistant",
+          "👋 欢迎使用嵌入式学习助手！直接在下方输入问题开始吧。"
+        );
+      }
+    </script>
+  </body>
+</html>
