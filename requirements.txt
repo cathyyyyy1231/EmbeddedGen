@@ -1,6 +1,7 @@
-Flask
-flask-cors
-python-dotenv
-requests
-gunicorn
-gevent
+Flask==3.0.3
+flask-cors==6.0.1
+python-dotenv==0.21.0
+requests==2.32.3
+urllib3==2.2.3
+gunicorn==23.0.0
+gevent==25.5.1
