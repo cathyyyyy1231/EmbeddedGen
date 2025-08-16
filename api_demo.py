@@ -7,7 +7,15 @@ from flask_cors import CORS
 from flask import jsonify
 load_dotenv()
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates', static_folder='static')
+
+# 可选：限制上传大小，防崩
+app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 API_URL = "https://xingchen-api.xf-yun.com/workflow/v1/chat/completions"
 API_KEY = os.getenv("API_KEY")
@@ -26,16 +34,16 @@ def upload_file_to_xingchen(file):
     }
 
     try:
-        response = requests.post(UPLOAD_URL, headers=headers, files=files)
+        response = requests.post(UPLOAD_URL, headers=headers, files=files,timeout=(10, 120))
         response.raise_for_status()
         data = response.json()
         if data.get("code") == 0 and "url" in data.get("data", {}):
             return data["data"]["url"]
         else:
-            print("❌ 上传失败响应：", data)
+            print("❌ 文件上传失败：", data)
             return None
     except Exception as e:
-        print("❌ 上传异常：", e)
+        print("❌ 文件上传异常：", e)
         return None
 
 
@@ -133,24 +141,49 @@ def chat_stream():
         },
         "stream": True
     }
-
     def generate():
-        with requests.post(API_URL, headers=headers, json=payload, stream=True) as r:
+        try:
+        # ✅ 加上连接/读取超时，防止长时间卡死
+            r = requests.post(
+                API_URL,
+                headers=headers,
+                json=payload,
+                stream=True,
+                timeout=(10, 300)  # (connect_timeout, read_timeout)
+            )
             r.raise_for_status()
+
             for line in r.iter_lines(decode_unicode=True):
                 if not line:
                     continue
 
-                s = line.lstrip()  # 去掉行首空格看前缀
-                # 上游已经是 data: …… → 原样透传（再补一个换行块界）
+                s = line.lstrip()
+                # 上游已经是 SSE 行，原样透传并补块界
                 if s.lower().startswith("data:"):
                     yield line + "\n\n"
-                # 上游直接给了 [DONE]（偶尔会这样）
                 elif s.strip() == "[DONE]":
                     yield "data: [DONE]\n\n"
-                # 普通 JSON 行 → 我们补一个 data: 前缀
                 else:
+                    # 普通 JSON 行 → 补 data: 前缀
                     yield f"data: {line}\n\n"
+
+        except requests.exceptions.Timeout:
+            # ⏱️ 上游超时：用 SSE 发回可读错误
+            yield 'data: {"code":408,"message":"上游超时(Timeout)，请缩小请求或稍后重试"}\n\n'
+
+        except requests.exceptions.HTTPError as e:
+            # 🔐 鉴权/参数/配额等 HTTP 错误
+            body = getattr(e.response, "text", "")
+            print("❌ 上游 HTTP 错误：", e, body[:500])
+            err = {"code": 502, "message": "上游 HTTP 错误", "detail": body[:500]}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            # 🌐 其它网络/解析/连接中断错误
+            print("❌ 流式请求异常：", repr(e))
+            err = {"code": 500, "message": "服务器异常", "detail": str(e)[:500]}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+
 
     return Response(
         generate(),
