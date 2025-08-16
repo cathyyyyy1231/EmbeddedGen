@@ -12,9 +12,6 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 # 可选：限制上传大小，防崩
 app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024
 
-@app.route('/')
-def index():
-    return render_template('index.html')
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 API_URL = "https://xingchen-api.xf-yun.com/workflow/v1/chat/completions"
