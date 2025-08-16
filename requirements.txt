@@ -4,4 +4,4 @@ python-dotenv==0.21.0
 requests==2.32.3
 urllib3==2.2.3
 gunicorn==23.0.0
-gevent==25.5.1
+
