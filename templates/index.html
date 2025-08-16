@@ -266,7 +266,14 @@
         }
         saveHistory();
       }
-
+      // 仅用于发送给后端：取最近 N 条历史，并做轻量裁剪
+      function historyForBackend(maxTurns = 10, maxChars = 4000) {
+        const clip = (s) => (s || "").slice(0, maxChars);
+        return chatHistory.slice(-maxTurns).map((h) => ({
+          role: h.role === "assistant" ? "assistant" : "user",
+          content: clip(h.content || ""),
+        }));
+      }
       // 首次渲染历史到页面
       function renderHistory() {
         messagesEl.innerHTML = "";
@@ -605,7 +612,8 @@
           "search_website",
           enableSearchEl && enableSearchEl.checked ? "true" : "false"
         ); // ✅ 关键
-
+        // 🔴 关键：把最近10条历史传给后端（字段名建议 conv_history）
+        formData.append("conv_history", JSON.stringify(historyForBackend(10)));
         files.forEach((file) => formData.append("files", file)); // 后端: request.files.getlist("files")
 
         // 3) 清空输入框与文件栏

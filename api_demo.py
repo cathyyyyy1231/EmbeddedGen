@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, Response
 import requests
 import os
+import json
 from dotenv import load_dotenv
 from flask_cors import CORS
 from flask import jsonify
@@ -62,9 +63,29 @@ def chat_stream():
     uid = request.form.get("uid", "web-user")
     # ✅ 读取前端传来的开关（前端需 formData.append("search_website", "1" / "0")）
     flag = str(request.form.get("search_website", "false")).strip().lower() in ("1","true","yes","on")
+    # ✅ 读取前端传来的“对话历史”（JSON 字符串）
+    raw_hist = request.form.get("conv_history", "[]")
+    try:
+        conv_history = json.loads(raw_hist) if isinstance(raw_hist, str) else (raw_hist or [])
+    except Exception:
+        conv_history = []
+    if not isinstance(conv_history, list):
+        conv_history = []
+
+    # ✅ 服务端兜底裁剪：最多 10 条，每条最多 4000 字符
+    MAX_TURNS, MAX_CHARS = 10, 4000
+    def clip(s): return (s or "")[:MAX_CHARS]
+    conv_history = [
+        {
+            "role": ("assistant" if (isinstance(h, dict) and h.get("role") == "assistant") else "user"),
+            "content": clip((h.get("content") if isinstance(h, dict) else "")),
+        }
+        for h in conv_history[-MAX_TURNS:]
+    ]
     parameters = {
         "AGENT_USER_INPUT": user_input,
         "search_website":  flag,   # ✅ 关键：布尔型开关（0/1）
+        "conv_history": conv_history,
     }
 
     # ✅ 上传所有文件并按类型分组
