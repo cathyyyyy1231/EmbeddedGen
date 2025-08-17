@@ -656,12 +656,49 @@
         chatHistory = [];
         saveHistory(); // 写回空数组
       });
-      // ✅ 页面加载后，如果历史为空，则展示一条欢迎语（不会污染历史）
+      // ✅ 页面加载后，如果历史为空，则展示欢迎语 + 预制问题
       if (messagesEl.children.length === 0) {
         addMessage(
           "assistant",
-          "👋 欢迎使用嵌入式学习助手！直接在下方输入问题开始吧。"
+          "👋 欢迎使用嵌入式学习助手！你可以直接输入问题，或点击下方的示例："
         );
+
+        // === 预制问题列表 ===
+        const PRESET_QUESTIONS = [
+          {
+            label: "生成 nRF54L15LED代码",
+            value: "给我nrf54l15的led闪烁代码,在vscode的nRF Connect SDK实现",
+          },
+          {
+            label: "STM32F4 + FreeRTOS + MPU6050 初始化代码",
+            value: "请给我STM32F4 + FreeRTOS + MPU6050 初始化代码",
+          },
+          {
+            label: "在网上查找新手进行树莓派pico开发的资料和网站",
+            value: "在网上查找新手进行树莓派pico开发的资料和网站",
+          },
+        ];
+
+        const presetWrap = document.createElement("div");
+        presetWrap.className = "mt-3 flex flex-wrap gap-2";
+
+        PRESET_QUESTIONS.forEach((q) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = q.label;
+          btn.className =
+            "px-3 py-1.5 rounded-full border text-sm hover:bg-gray-50 active:scale-[0.98] transition";
+          btn.title = q.value;
+
+          btn.addEventListener("click", () => {
+            inputEl.value = q.value;
+            chatForm.requestSubmit(); // 自动提交表单，相当于点击“发送”
+          });
+
+          presetWrap.appendChild(btn);
+        });
+
+        messagesEl.appendChild(presetWrap);
       }
     </script>
   </body>
